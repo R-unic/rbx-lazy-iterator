@@ -16,6 +16,34 @@ type SkipSymbol = symbol & {
 	readonly __skip?: undefined;
 };
 
+function keys<K extends string | number | symbol = string | number | symbol>(object: Record<K, unknown> | Map<K, unknown>) {
+	let k: K;
+
+	return () => {
+		[k] = next(<Record<K, unknown>>object, k);
+		return k;
+	};
+}
+
+function keysOfSet<V>(set: Set<V>) {
+	let v: V;
+
+	return () => {
+		[v] = next(set, v);
+		return v;
+	};
+}
+
+function values<V = unknown>(object: Record<string | number | symbol, V> | Map<string | number | symbol, V> | V[]) {
+	let k: string | number | symbol;
+	let v: V;
+
+	return () => {
+		[k, v] = next(<Record<string | number | symbol, V>>object, k);
+		return v;
+	};
+}
+
 /** Combines multiple array operations into an iterator and only applies operations when the iterator is processed */
 export default class LazyIterator<T extends defined> {
 	/** Symbol used to represent a value to remove in an iterator */
@@ -28,27 +56,26 @@ export default class LazyIterator<T extends defined> {
 
 	/** Creates an iterator from the keys of a record/map */
 	public static fromKeys<K extends string | number | symbol>(object: Record<K, unknown> | Map<K, unknown>): LazyIterator<K> {
-		return this.fromArray(<K[]>Object.keys(object));
+		return new LazyIterator(keys(object));
 	}
 
 	/** Creates an iterator from the values of a record/map */
 	public static fromValues<V extends defined>(object: Record<string | number | symbol, V> | Map<string | number | symbol, V>): LazyIterator<V> {
-		return this.fromArray(<V[]>Object.values(object));
+		return new LazyIterator(values(object));
 	}
 
 	/** Creates an iterator from an array */
 	public static fromArray<T extends defined>(array: T[]): LazyIterator<T> {
-		let i = 0;
-		return new LazyIterator(() => array[i++]);
+		return new LazyIterator(values(array));
 	}
 
 	/** Creates an iterator from a set */
 	public static fromSet<T extends defined>(set: Set<T>): LazyIterator<T> {
-		return this.fromArray([...set]);
+		return new LazyIterator(keysOfSet(set));
 	}
 
 	/** **Note:** This method processes the iterator, meaning you will not be able to apply any more operations after calling this */
-	public isEqual(other: LazyIterator<T>): boolean {
+	public equals(other: LazyIterator<T>): boolean {
 		return this.every((item, i) => item === other.clone().at(i))
 	}
 
