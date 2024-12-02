@@ -1,0 +1,42 @@
+{
+  "name": "@rbxts/lazy-iterator",
+  "version": "1.0.0",
+  "main": "out/init.lua",
+  "scripts": {
+    "build": "rbxtsc",
+    "watch": "rbxtsc -w",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "roblox",
+    "rbxts",
+    "lazy",
+    "iterator",
+    "iteration",
+    "iter"
+  ],
+  "repository": {
+    "url": "https://github.com/R-unic/rbx-lazy-iterator"
+  },
+  "author": "runicly",
+  "license": "ISC",
+  "description": "Combines multiple array operations into an iterator and only applies operations when the iterator is processed",
+  "types": "out/index.d.ts",
+  "files": [
+    "out",
+    "!**/*.tsbuildinfo"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@rbxts/compiler-types": "^3.0.0-types.0",
+    "@rbxts/types": "^1.0.813",
+    "roblox-ts": "^3.0.0",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@rbxts/object-utils": "^1.0.4",
+    "@rbxts/string-builder": "^1.0.0"
+  }
+}
