@@ -45,6 +45,7 @@ function values<V = unknown>(object: Record<string | number | symbol, V> | Map<s
 export default class LazyIterator<T extends defined> {
   /** Symbol used to represent a value to remove in an iterator */
   public static readonly Skip = createSymbol<SkipSymbol>("LazyIterator.Skip");
+
   private finished = false;
 
   public constructor(
@@ -72,7 +73,7 @@ export default class LazyIterator<T extends defined> {
   }
 
   public toIterator(): () => T | SkipSymbol | undefined {
-    return this.nextItem;
+    return this.clone().nextItem;
   }
 
   /** **Note:** This method processes the iterator, meaning you will not be able to apply any more operations after calling this */
@@ -86,12 +87,11 @@ export default class LazyIterator<T extends defined> {
     while (!this.finished) {
       const currentValue = this.nextItem();
       if (currentValue === undefined) break;
-      if (currentValue !== LazyIterator.Skip) {
-        if (currentValue === value)
-          return currentIndex;
+      if (currentValue === LazyIterator.Skip) continue;
+      if (currentValue === value)
+        return currentIndex;
 
-        currentIndex++;
-      }
+      currentIndex++;
     }
 
     return -1;
@@ -102,19 +102,19 @@ export default class LazyIterator<T extends defined> {
     while (!this.finished) {
       const value = this.nextItem();
       if (value === undefined) break;
-      if (value !== LazyIterator.Skip)
-        return <T>value;
+      if (value === LazyIterator.Skip) continue;
+      return value as T;
     }
   }
 
   /** **Note:** This method processes the iterator, meaning you will not be able to apply any more operations after calling this */
   public last(): Maybe<T> {
-    let lastValue: Maybe<T> = undefined;
+    let lastValue: Maybe<T>;
     while (!this.finished) {
       const value = this.nextItem();
-      if (value === undefined) break
-      if (value !== LazyIterator.Skip)
-        lastValue = <T>value;
+      if (value === undefined) break;
+      if (value === LazyIterator.Skip) continue;
+      lastValue = value as T;
     }
 
     return lastValue;
@@ -128,9 +128,9 @@ export default class LazyIterator<T extends defined> {
     while (!this.finished) {
       const value = this.nextItem();
       if (value === undefined) break;
-      if (value !== LazyIterator.Skip)
-        if (currentIndex++ === index)
-          return <T>value;
+      if (value === LazyIterator.Skip) continue;
+      if (currentIndex++ !== index) continue;
+      return value as T;
     }
   }
 
@@ -222,38 +222,24 @@ export default class LazyIterator<T extends defined> {
   }
 
   public take(amount: number): LazyIterator<T> {
-    let index = 0;
+    let count = 0;
     const oldNext = this.nextItem;
     this.nextItem = () => {
-      if (index >= amount) {
-        this.finished = true;
-        return undefined!;
-      }
-
-      while (true) {
-        const value = oldNext();
-        if (value === LazyIterator.Skip) continue;
-        if (value === undefined) return undefined!;
-
-        index++;
-        return value;
-      }
+      const value = oldNext();
+      if (value === LazyIterator.Skip) return value;
+      return count++ >= amount ? undefined! : value;
     };
 
     return this;
   }
 
   public skip(amount: number): LazyIterator<T> {
-    let index = 0;
+    let count = 0;
     const oldNext = this.nextItem;
     this.nextItem = () => {
-      if (index < amount) {
-        const value = oldNext();
-        if (value === LazyIterator.Skip) return value;
-        index++;
-      }
-
-      return oldNext();
+      const value = oldNext();
+      if (value === LazyIterator.Skip) return value;
+      return count++ < amount ? LazyIterator.Skip : value;
     };
 
     return this;
@@ -316,15 +302,14 @@ export default class LazyIterator<T extends defined> {
   }
 
   /** **Note:** This method processes the iterator, meaning you will not be able to apply any more operations after calling this */
-  public join(separator: string): string {
+  public join(separator = ", "): string {
     const result: string[] = [];
-    let isFirstValue = true;
 
     while (!this.finished) {
       const value = this.nextItem();
       if (value === undefined) break;
-      if (value !== LazyIterator.Skip)
-        result.push(tostring(value));
+      if (value === LazyIterator.Skip) continue;
+      result.push(tostring(value));
     }
 
     return result.join(separator);
