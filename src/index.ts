@@ -234,6 +234,7 @@ export default class LazyIterator<T extends defined> {
 
   public filter<S extends T>(predicate: (value: T) => value is S): LazyIterator<S>
   public filter(predicate: (value: T) => boolean): LazyIterator<T>
+
   public filter(predicate: (value: T) => boolean): LazyIterator<T> {
     const oldNext = this.nextItem;
     this.nextItem = () => {
