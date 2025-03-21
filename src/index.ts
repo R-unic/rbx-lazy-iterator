@@ -24,9 +24,15 @@ function keys<K extends string | number | symbol = string | number | symbol>(obj
 
 function keysOfSet<V>(set: Set<V>) {
   let v: V;
+  let d: boolean | undefined;
+  let ended = false;
 
   return () => {
-    [v] = next(set, v);
+    [v, d] = next(set, v);
+    if (ended) return undefined!;
+    if (d === undefined)
+      ended = true;
+
     return v;
   };
 }
@@ -34,9 +40,14 @@ function keysOfSet<V>(set: Set<V>) {
 function values<V = unknown>(object: Record<string | number | symbol, V> | Map<string | number | symbol, V> | V[]) {
   let k: string | number | symbol;
   let v: V;
+  let ended = false;
 
   return () => {
     [k, v] = next(<Record<string | number | symbol, V>>object, k);
+    if (ended) return undefined!;
+    if (v === undefined)
+      ended = true;
+
     return v;
   };
 }
@@ -72,7 +83,7 @@ export default class LazyIterator<T extends defined> {
     return new LazyIterator(keysOfSet(set));
   }
 
-  public toIterator(): () => T | SkipSymbol | undefined {
+  public getIterator(): () => T | SkipSymbol | undefined {
     return this.clone().nextItem;
   }
 
@@ -134,34 +145,62 @@ export default class LazyIterator<T extends defined> {
     }
   }
 
-  public append(element: T): LazyIterator<T> {
+  public append(...elements: T[]): LazyIterator<T>
+  public append(iterator: LazyIterator<T>): LazyIterator<T>
+  public append(iterator: LazyIterator<T> | T, ...elements: T[]): LazyIterator<T> {
+    const passedIterator = iterator instanceof LazyIterator;
+    const iteratorNext = passedIterator ? iterator.getIterator() : undefined;
     const oldNext = this.nextItem;
     let exhausted = false;
+    let i = 0;
 
     this.nextItem = () => {
       if (exhausted) return undefined!;
 
       const value = oldNext();
-      if (value === undefined) {
-        exhausted = true;
-        return element;
-      }
+      if (value !== undefined)
+        return value;
 
-      return value;
+      if (!passedIterator)
+        exhausted = i === elements.size();
+
+      return passedIterator
+        ? iteratorNext!()!
+        : (i++ === 0 ? iterator as T : elements[i - 2]);
     };
 
     return this;
   }
 
-  public prepend(element: T): LazyIterator<T> {
+  public prepend(...elements: T[]): LazyIterator<T>
+  public prepend(iterator: LazyIterator<T>): LazyIterator<T>
+  public prepend(iterator: LazyIterator<T> | T, ...elements: T[]): LazyIterator<T> {
+    const passedIterator = iterator instanceof LazyIterator;
+    const iteratorNext = passedIterator ? iterator.getIterator() : undefined;
     const oldNext = this.nextItem;
-    let yielded = false;
+    let prepended = false;
+    let i = 0;
 
     this.nextItem = () => {
-      if (!yielded) {
-        yielded = true;
-        return element;
+      if (!prepended) {
+        if (!passedIterator)
+          prepended = i === elements.size();
+
+        const value = passedIterator
+          ? iteratorNext!()!
+          : (i++ === 0 ? iterator as T : elements[i - 2]);
+
+        if (passedIterator && value === undefined) {
+          prepended = true;
+          return this.nextItem();
+        }
+
+        return value;
       }
+
+      const value = passedIterator && i < elements.size() ? iteratorNext!() : undefined;
+      if (value !== undefined)
+        return value;
 
       return oldNext();
     };
@@ -170,7 +209,7 @@ export default class LazyIterator<T extends defined> {
   }
 
   /** **Note:** This method clones the iterator and allocates a table into memory to sort */
-  public sort(comparator: (a: T, b: T) => boolean): LazyIterator<T> {
+  public sort(comparator?: (a: T, b: T) => boolean): LazyIterator<T> {
     const collectedItems = this.clone().collect();
     collectedItems.sort(comparator);
     return LazyIterator.fromArray(collectedItems);
@@ -182,17 +221,15 @@ export default class LazyIterator<T extends defined> {
       while (true) {
         const value = oldNext();
         if (value === undefined) return undefined!;
+        if (value === LazyIterator.Skip)
+          return value;
 
-        if (value !== LazyIterator.Skip) {
-          const transformed = transform(<T>value);
-          if (transformed !== LazyIterator.Skip)
-            return <never>transformed; // hack
-        } else
-          return LazyIterator.Skip;
+        const transformed = transform(value as T);
+        return transformed as T | SkipSymbol; // hack
       }
     };
 
-    return <never>this; // hack
+    return this as never; // hack
   }
 
   public filter<S extends T>(predicate: (value: T) => value is S): LazyIterator<S>
@@ -215,12 +252,30 @@ export default class LazyIterator<T extends defined> {
     return this;
   }
 
+  /**
+   * **Note:** This method processes the iterator, meaning you will not be able to apply any more operations after calling this
+   * @returns The first element that satisfies the predicate, or `undefined` if no such element exists
+   */
   public find<S extends T>(predicate: (value: T) => value is S): Maybe<S>
   public find(predicate: (value: T) => boolean): Maybe<T>
   public find(predicate: (value: T) => boolean): Maybe<T> {
     return this.filter(predicate).first();
   }
 
+  /**
+   * **Note:** This method processes the iterator, meaning you will not be able to apply any more operations after calling this
+   * @returns The last element that satisfies the predicate, or `undefined` if no such element exists
+   */
+  public findLast<S extends T>(predicate: (value: T) => value is S): Maybe<S>
+  public findLast(predicate: (value: T) => boolean): Maybe<T>
+  public findLast(predicate: (value: T) => boolean): Maybe<T> {
+    return this.filter(predicate).last();
+  }
+
+  /**
+   * Yields the first `amount` of elements in the iterator.
+   * @param amount The amount of elements to take.
+   */
   public take(amount: number): LazyIterator<T> {
     let count = 0;
     const oldNext = this.nextItem;
@@ -233,6 +288,10 @@ export default class LazyIterator<T extends defined> {
     return this;
   }
 
+  /**
+   * Skips the first `amount` of elements in the iterator.
+   * @param amount The amount of elements to skip.
+   */
   public skip(amount: number): LazyIterator<T> {
     let count = 0;
     const oldNext = this.nextItem;
@@ -245,31 +304,43 @@ export default class LazyIterator<T extends defined> {
     return this;
   }
 
-  /** **Note:** This method processes the iterator, meaning you will not be able to apply any more operations after calling this */
+  /**
+   * Reduces the iterator with the given reducer. The initial value is the first element of the iterator.
+   *
+   * **Note:** This method processes the iterator, meaning you will not be able to apply any more operations after calling this
+   * @param reducer The reducer function.
+   * @returns The final value of the accumulator, or `undefined` if the iterator is empty.
+   */
   public reduce(reducer: (accumulation: T, value: T) => T): Maybe<T> {
     let accumulation: Maybe<T> = undefined;
     while (!this.finished) {
       const value = this.nextItem();
       if (value === undefined) break;
-      if (value !== LazyIterator.Skip) {
-        if (accumulation === undefined)
-          accumulation = <T>value
-        else
-          accumulation = reducer(accumulation, <T>value);
-      }
+      if (value === LazyIterator.Skip) continue;
+      accumulation = accumulation === undefined
+        ? value as T
+        : reducer(accumulation, value as T);
     }
 
     return accumulation;
   }
 
-  /** **Note:** This method processes the iterator, meaning you will not be able to apply any more operations after calling this */
+  /**reducer(accumulation, value as T)
+   * Reduces the iterator with the given reducer and initial value, and returns the final value of the accumulator.
+   * This method is similar to `reduce`, but it takes an initial value that is used as the first value of the accumulator.
+   *
+   * **Note:** This method processes the iterator, meaning you will not be able to apply any more operations after calling this
+   * @param reducer The reducer function to use to reduce the iterator.
+   * @param initial The initial value of the accumulator.
+   * @returns The final value of the accumulator.
+   */
   public fold(reducer: (accumulation: T, value: T) => T, initial: T): Maybe<T> {
     let accumulation = initial;
     while (!this.finished) {
       const value = this.nextItem();
       if (value === undefined) break;
-      if (value !== LazyIterator.Skip)
-        accumulation = reducer(accumulation, <T>value);
+      if (value === LazyIterator.Skip) continue;
+      accumulation = reducer(accumulation, value as T);
     }
 
     return accumulation;
