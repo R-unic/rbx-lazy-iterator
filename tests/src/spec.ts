@@ -67,6 +67,13 @@ class LazyIteratorTest {
   }
 
   @Fact
+  public includes(): void {
+    const iterator = LazyIterator.fromArray([1, 2, 3, 4]);
+    Assert.true(iterator.clone().includes(3));
+    Assert.false(iterator.includes(5));
+  }
+
+  @Fact
   public clone(): void {
     const iterator = LazyIterator.fromArray([1, 2, 3, 4]);
     const clonedIterator = iterator.clone();

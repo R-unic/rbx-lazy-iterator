@@ -4,20 +4,20 @@ declare const newproxy: <T extends symbol = symbol>(addMetatable: boolean) => T;
 /** Create a unique symbol */
 function createSymbol<T extends symbol = symbol>(name: string): T {
   const symbol = newproxy<T>(true);
-  const mt = <Record<string, unknown>>getmetatable(<never>symbol);
+  const mt = getmetatable(symbol as never) as Record<string, unknown>;
   mt.__tostring = () => name;
   return symbol;
 }
 
 type SkipSymbol = symbol & {
-  readonly __skip?: undefined;
+  readonly __skip?: void;
 };
 
 function keys<K extends string | number | symbol = string | number | symbol>(object: Record<K, unknown> | Map<K, unknown>) {
   let k: K;
 
   return () => {
-    [k] = next(<Record<K, unknown>>object, k);
+    [k] = next(object as Record<K, unknown>, k);
     return k;
   };
 }
@@ -43,7 +43,7 @@ function values<V = unknown>(object: Record<string | number | symbol, V> | Map<s
   let ended = false;
 
   return () => {
-    [k, v] = next(<Record<string | number | symbol, V>>object, k);
+    [k, v] = next(object as Record<string | number | symbol, V>, k);
     if (ended) return undefined!;
     if (v === undefined)
       ended = true;
@@ -234,7 +234,6 @@ export default class LazyIterator<T extends defined> {
 
   public filter<S extends T>(predicate: (value: T) => value is S): LazyIterator<S>
   public filter(predicate: (value: T) => boolean): LazyIterator<T>
-
   public filter(predicate: (value: T) => boolean): LazyIterator<T> {
     const oldNext = this.nextItem;
     this.nextItem = () => {
@@ -242,7 +241,7 @@ export default class LazyIterator<T extends defined> {
         const value = oldNext();
         if (value === undefined) return undefined!;
         if (value !== LazyIterator.Skip)
-          return predicate(<T>value) ? value : LazyIterator.Skip;
+          return predicate(value as T) ? value : LazyIterator.Skip;
         else
           return LazyIterator.Skip;
       }
@@ -347,13 +346,17 @@ export default class LazyIterator<T extends defined> {
     return accumulation;
   }
 
+  public includes(value: T): boolean {
+    return this.some(v => v === value);
+  }
+
   /** **Note:** This method processes the iterator, meaning you will not be able to apply any more operations after calling this */
   public some(predicate: (value: T, index: number) => boolean): boolean {
     let index = 0;
     while (!this.finished) {
       const value = this.nextItem();
       if (value === undefined) break;
-      if (value !== LazyIterator.Skip && predicate(<T>value, index++))
+      if (value !== LazyIterator.Skip && predicate(value as T, index++))
         return true;
     }
 
@@ -366,7 +369,7 @@ export default class LazyIterator<T extends defined> {
     while (!this.finished) {
       const value = this.nextItem();
       if (value === undefined) break;
-      if (value !== LazyIterator.Skip && !predicate(<T>value, index++))
+      if (value !== LazyIterator.Skip && !predicate(value as T, index++))
         return false;
     }
 
@@ -411,9 +414,9 @@ export default class LazyIterator<T extends defined> {
 
       if (value !== LazyIterator.Skip)
         if (process !== undefined)
-          process(<T>value);
+          process(value as T);
         else
-          results!.push(<T>value);
+          results!.push(value as T);
     }
 
     return process !== undefined ? undefined : results;
