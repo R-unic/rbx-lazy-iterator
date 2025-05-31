@@ -112,14 +112,14 @@ class LazyIteratorTest {
 
   @Fact
   public findLast(): void {
-    const value = LazyIterator.fromArray([1, 2, 3, 4, 5, 6]).findLast(n => n > 3);
+    const value = LazyIterator.fromTuple(1, 2, 3, 4, 5, 6).findLast(n => n > 3);
     Assert.equal(6, value);
   }
 
   @Fact
   public appendIterator(): void {
-    const getNext = LazyIterator.fromArray([1, 2, 3])
-      .append(LazyIterator.fromArray([4, 5, 6]))
+    const getNext = LazyIterator.fromTuple(1, 2, 3)
+      .append(LazyIterator.fromTuple(4, 5, 6))
       .getIterator();
 
     Assert.equal(1, getNext());
@@ -133,7 +133,7 @@ class LazyIteratorTest {
 
   @Fact
   public appendValues(): void {
-    const getNext = LazyIterator.fromArray([1, 2, 3])
+    const getNext = LazyIterator.fromTuple(1, 2, 3)
       .append(4, 5, 6)
       .getIterator();
 

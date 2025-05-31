@@ -38,14 +38,16 @@ function keysOfSet<V>(set: Set<V>): () => V | SkipSymbol {
   };
 }
 
-function values<V = unknown>(object: ReadonlyMap<IndexType, V> | V[] | object): () => V | SkipSymbol {
+function values<V>(object: ReadonlyMap<IndexType, V> | V[] | object): () => V | SkipSymbol {
   let k: IndexType;
   let v: V;
+  let ended = false;
 
   return () => {
     [k, v] = next(object as Record<IndexType, V>, k);
-    if (v === undefined)
-      return LazyIterator.Skip;
+    if (ended) return undefined!;
+    if (k === undefined)
+      ended = true;
 
     return v;
   };
@@ -80,6 +82,11 @@ export default class LazyIterator<T extends defined> {
   /** Creates an iterator from an array */
   public static fromArray<T extends defined>(array: T[]): LazyIterator<T> {
     return new LazyIterator(values(array));
+  }
+
+  /** Creates an iterator from a tuple */
+  public static fromTuple<T extends defined>(...args: T[]): LazyIterator<T> {
+    return this.fromArray(args);
   }
 
   /** Creates an iterator from a set */

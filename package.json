@@ -7,7 +7,8 @@
     "build": "npm run setup-rokit && rbxtsc ",
     "dev": "npm run build -- -w",
     "prepublishOnly": "npm test",
-    "test": "npm run build && npm run build -- -p tests && rojo build tests -o tests/test-environment.rbxl && lune run tests tests/test-environment.rbxl"
+    "test": "npm run build && npm run build -- -p tests && rojo build tests -o tests/test-environment.rbxl && npm run test:execute",
+    "test:execute": "lune run tests tests/test-environment.rbxl"
   },
   "keywords": [
     "roblox",
