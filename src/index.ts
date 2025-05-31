@@ -334,7 +334,7 @@ export default class LazyIterator<T extends defined> {
    * @param initial The initial value of the accumulator.
    * @returns The final value of the accumulator.
    */
-  public fold(reducer: (accumulation: T, value: T) => T, initial: T): Maybe<T> {
+  public fold(reducer: (accumulation: T, value: T) => T, initial: T): T {
     let accumulation = initial;
     while (!this.finished) {
       const value = this.nextItem();
