@@ -1,6 +1,6 @@
 {
   "name": "@rbxts/lazy-iterator",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "main": "out/init.lua",
   "scripts": {
     "setup-rokit": "rokit trust lune-org/lune && rokit trust rojo-rbx/rojo && rokit install",

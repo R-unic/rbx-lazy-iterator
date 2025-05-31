@@ -1,4 +1,5 @@
 type Maybe<T> = T | undefined;
+type IndexType = string | number | symbol;
 declare const newproxy: <T extends symbol = symbol>(addMetatable: boolean) => T;
 
 /** Create a unique symbol */
@@ -13,7 +14,7 @@ type SkipSymbol = symbol & {
   readonly __skip?: void;
 };
 
-function keys<K extends string | number | symbol = string | number | symbol>(object: Record<K, unknown> | Map<K, unknown>) {
+function keys<K extends IndexType>(object: Record<K, unknown> | Map<K, unknown>): () => K | SkipSymbol {
   let k: K;
 
   return () => {
@@ -22,7 +23,7 @@ function keys<K extends string | number | symbol = string | number | symbol>(obj
   };
 }
 
-function keysOfSet<V>(set: Set<V>) {
+function keysOfSet<V>(set: Set<V>): () => V | SkipSymbol {
   let v: V;
   let d: boolean | undefined;
   let ended = false;
@@ -37,16 +38,14 @@ function keysOfSet<V>(set: Set<V>) {
   };
 }
 
-function values<V = unknown>(object: Record<string | number | symbol, V> | Map<string | number | symbol, V> | V[]) {
-  let k: string | number | symbol;
+function values<V = unknown>(object: ReadonlyMap<IndexType, V> | V[] | object): () => V | SkipSymbol {
+  let k: IndexType;
   let v: V;
-  let ended = false;
 
   return () => {
-    [k, v] = next(object as Record<string | number | symbol, V>, k);
-    if (ended) return undefined!;
+    [k, v] = next(object as Record<IndexType, V>, k);
     if (v === undefined)
-      ended = true;
+      return LazyIterator.Skip;
 
     return v;
   };
@@ -64,13 +63,18 @@ export default class LazyIterator<T extends defined> {
   ) { }
 
   /** Creates an iterator from the keys of a record/map */
-  public static fromKeys<K extends string | number | symbol>(object: Record<K, unknown> | Map<K, unknown>): LazyIterator<K> {
-    return new LazyIterator(keys(object));
+  public static fromKeys<K extends IndexType>(object: Record<K, unknown>): LazyIterator<K>;
+  public static fromKeys<K extends IndexType>(object: ReadonlyMap<K, unknown>): LazyIterator<K>;
+  public static fromKeys<T extends object>(object: T): LazyIterator<keyof T & IndexType> {
+    return new LazyIterator(keys(object)) as never;
   }
 
   /** Creates an iterator from the values of a record/map */
-  public static fromValues<V extends defined>(object: Record<string | number | symbol, V> | Map<string | number | symbol, V>): LazyIterator<V> {
-    return new LazyIterator(values(object));
+  public static fromValues<V>(object: Record<IndexType, V>): LazyIterator<NonNullable<V>>;
+  public static fromValues<V>(object: ReadonlyMap<IndexType, V>): LazyIterator<NonNullable<V>>;
+  public static fromValues<T>(object: ReadonlySet<T>): LazyIterator<true>;
+  public static fromValues<T extends object>(object: T): keyof T extends never ? LazyIterator<defined> : LazyIterator<NonNullable<T[keyof T]>> {
+    return new LazyIterator(values(object)) as never;
   }
 
   /** Creates an iterator from an array */
@@ -89,7 +93,7 @@ export default class LazyIterator<T extends defined> {
 
   /** **Note:** This method processes the iterator, meaning you will not be able to apply any more operations after calling this */
   public equals(other: LazyIterator<T>): boolean {
-    return this.every((item, i) => item === other.clone().at(i))
+    return this.every((item, i) => item === other.clone().at(i));
   }
 
   /** **Note:** This method processes the iterator, meaning you will not be able to apply any more operations after calling this */
